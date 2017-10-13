@@ -1,0 +1,288 @@
+最近在弄IOS泰国的一个游戏版本，泰国啥也没准备，全部自己来弄，被逼看了一下OC的书，网上查查资料，花了半个多月的时间总算是把登陆注册和记住账号密码的功能搞完，又火急火燎的接入Facebook授权登陆游戏的功能(外国的朋友好像都用这玩意儿)。
+没有写微博的习惯，就在QQ这里记录分享一下：
+
+1、IOS应用接入FaceBook SDK(以游戏客户端为例)
+
+先去官网下载最新的FB SDK，准备和配置工作请参照官方文档：
+https://developers.facebook.com/docs/ios/getting-started
+文档写的很详细
+
+// 下面三个都是AppController自带的method，添加进去即可
+// 具体用处请参照https://developers.facebook.com/docs/games/mobile/ios-tutorial/#authenticate.
+
+- (void)applicationWillTerminate:(UIApplication *)application
+{
+    [[FBSession activeSession] close];
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application 
+{
+    [FBAppCall handleDidBecomeActive];
+}
+
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
+  sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
+    
+    [FBAppCall handleOpenURL:url sourceApplication:sourceApplication fallbackHandler:^(FBAppCall *call) {
+        // @"599916363389289"是我自己申请的 facebook app id
+        if (call.appLinkData && call.appLinkData.targetURL) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"599916363389289" object:call.appLinkData.targetURL];
+        }
+        
+    }];
+    
+    return YES;
+}
+
+
+// Facebook授权  facebook vision 3.1.3
+// 包含、创建FB会话、FB登陆和获取FB用户信息
+// AppController.mm
+- (void) FB_CreateNewSession
+{
+    FBSession* session = [[FBSession alloc] init];
+    [FBSession setActiveSession: session];
+}
+
+- (void) FB_Login
+{
+    NSArray *permissions = [[NSArray alloc] initWithObjects:
+                            @"email",
+                            nil];
+    
+    // Attempt to open the session. If the session is not open, show the user the Facebook login UX
+    [FBSession openActiveSessionWithReadPermissions:permissions allowLoginUI:true completionHandler:^(FBSession *session, FBSessionState status, NSError *error)
+    {
+        
+        // Did something go wrong during login? I.e. did the user cancel?
+        
+        if (status == FBSessionStateClosedLoginFailed || status == FBSessionStateClosed || status == FBSessionStateCreatedOpening)
+        {
+            // If so, just send them round the loop again
+            [[FBSession activeSession] closeAndClearTokenInformation];
+            [FBSession setActiveSession:nil];
+            GameManager::GetSingleton().FB_CreateNewSession();;
+            ms_bIsLoggedIn = false;
+//            callback(false);
+        }
+        else
+        {
+            // 登陆成功回调
+            ms_bIsLoggedIn = true;
+            // 调用弹出IOS中自定义的提示框
+            GameManager::GetSingleton().FB_LoginSuccesed();
+            // 获取登陆成功后User info
+            GameManager::GetSingleton().FB_Customize();
+//            callback(true);
+        }
+    }];
+//
+}
+
+- (void) FB_Customize
+{
+    // Start the facebook request
+    [[FBRequest requestForMe]
+     startWithCompletionHandler:
+     ^(FBRequestConnection *connection, NSDictionary<FBGraphUser> *result, NSError *error)
+     {
+         // Did everything come back okay with no errors?
+         if (!error && result)
+         {
+             // If so we can extract out the player's Facebook ID and first name
+             m_uPlayerFBID = [result.id longLongValue];
+             
+             m_nsstrUserName = [[NSString alloc] initWithString:result.first_name];
+             
+             // 使用FB信息登陆游戏
+             std::string userName = [m_nsstrUserName UTF8String];
+             SnsMan::getSingleton().loginWithFacebookAccountRet(m_uPlayerFBID, userName);
+//             callback(true);
+         }
+         else
+         {
+//             callback(false);
+         }
+         
+     }];
+}
+
+// 添加FB登陆成功的提示框（UIAlertView:IOS中自带的view方法）
+- (void) dimissAlert:(UIAlertView *)alert
+{
+    if(alert)
+    {
+        [alert dismissWithClickedButtonIndex:[alert cancelButtonIndex] animated:YES];
+        [alert release];
+    }
+}
+// 可修改提示框的Title & Content
+- (void)showAlert
+{
+    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Welcome to Facebook!" message:@"The Facebook login successfully.   Please wait..." delegate:nil
+                                          cancelButtonTitle:nil otherButtonTitles:nil];
+    
+    [alert show];
+    [self performSelector:@selector(dimissAlert:) withObject:alert afterDelay:2.0];
+}
+
+// 声明变量用于实现中使用和回调使用
+// AppController.h
+#import "FacebookSDK/FacebookSDK.h"
+
+@class RootViewController;
+
+@interface AppController : NSObject <UIAccelerometerDelegate, UIAlertViewDelegate, UITextFieldDelegate,UIApplicationDelegate> 
+{
+    UIWindow *window;
+    RootViewController  *viewController;
+    
+    NSString* m_nsstrUserName;
+    uint64_t m_uPlayerFBID;
+    uint64_t m_uFriendFBID;
+    ACAccount* m_facebookAccount;
+    NSURL *openedURL;
+    bool ms_bIsLoggedIn;
+
+}
+//- (void) TalkingDataAppCpaCallBack;
+@end
+
+// FB相关的方法调用
+// GameManager.h
+
+public:
+    void FB_CreateNewSession();
+    void FB_Login();
+    void FB_Logout();
+    void FB_Customize();
+    void FB_LoginSuccesed();
+
+// GameManager.mm or 
+GameManager.cpp调用，以下方法的具体实现代码也可以在本文件中实现，减少delegate这一步
+void GameManager::FB_CreateNewSession()
+{
+    [[[UIApplication sharedApplication] delegate] FB_CreateNewSession];
+}
+
+void GameManager::FB_Login()
+{
+[[[UIApplication sharedApplication] delegate] FB_Login];
+}
+
+void GameManager::FB_Customize()
+{
+[[[UIApplication sharedApplication] delegate] FB_Customize];
+}
+
+void GameManager::FB_LoginSuccesed()
+{
+    [[[UIApplication sharedApplication] delegate] showAlert];
+}
+
+
+2、简单的file读写流，保存账号密码例，下面的方法是覆盖
+
+// 写到文件"VMany.dat"
+bool CZMan::SavePassword(bool isSaved)
+{
+    CCLOG("CZMan::savePassword begin");
+std::string writePath = CCFileUtils::getWriteablePath();
+writePath.append("VMany.dat");
+    
+mHasAccount = true;
+FILE* fp = fopen(writePath.c_str(), "wb");
+    
+if (fp)
+{
+fwrite(&mDatSaveVersion, sizeof(mDatSaveVersion), 1, fp);
+        
+int aSize = (int)mID.size();
+fwrite(&aSize, sizeof(aSize), 1, fp);
+fwrite(&mID[0], aSize*sizeof(mID[0]), 1, fp);
+        //登陆不成功或没有选择记住密码功能，则不保存密码
+        if(isSaved)
+        {
+            int pSize = (int)mPWD.size();
+            fwrite(&pSize, sizeof(pSize), 1, fp);
+            fwrite(&mPWD[0], pSize*sizeof(mID[0]), 1, fp);
+        }
+        
+fclose(fp);
+        CCLOG("CZMan::savePassword end");
+return true;
+}
+return false;
+}
+//-----------------------------------------------------------------------------
+// 读文件"VMany.dat"
+bool CZMan::LoadPassword()
+{
+    CCLOG("CZMan::loadPassword begin");
+    std::string writePath = CCFileUtils::getWriteablePath();
+writePath.append("VMany.dat");
+    
+FILE* fp = fopen(writePath.c_str(), "rb");
+    
+CCLOG("%s", writePath.c_str());
+    
+if (fp)
+{
+int version = 0;
+fread(&version, sizeof(version), 1, fp);
+        
+if (0 == version)
+{
+int aSize;
+fread(&aSize, sizeof(aSize), 1, fp);
+mID.resize(aSize);
+fread(&mID[0], aSize*sizeof(mID[0]), 1, fp);
+            
+int pSize;
+fread(&pSize, sizeof(pSize), 1, fp);
+mPWD.resize(pSize);
+fread(&mPWD[0], pSize*sizeof(mID[0]), 1, fp);
+            
+mHasAccount = true;
+            
+return true;
+}
+else
+{
+return false;
+}
+        
+fclose(fp);
+}
+    
+CCLOG("loadPassword end");
+mHasAccount = false;
+return false;
+}
+//-----------------------------------------------------------------------------
+
+// at .h
+_tstring mID;
+_tstring mPWD;
+
+// 此为oc获取文件路径的方法，在C++中文件的路径则是从工程文件所处的目录的开始计算的
+
+std::string CCFileUtils::getWriteablePath()
+    {
+        // save to document folder
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        std::string strRet = [documentsDirectory UTF8String];
+        strRet.append("/");
+        return strRet;
+    }
+
+// eg:在文件夹A/中有一个VS工程xx.sln，同目录下有个res文件夹，如果想保存在res/下，则文件的路径是res/VMany.dat
+// json文件的方法更简单:
+std::ifstream JsonFile("path");
+if ( JsonFile.is_open() )
+{
+// call function use the file content
+JsonFile.close();
+}
+// 不知道适用不适用其它文件 
