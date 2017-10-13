@@ -1,0 +1,19 @@
+源代码都在我QQ空间的附件里：http://user.qzone.qq.com/460076708/2
+1、使用IOS自带的MediaPlayer.framework实现应用内播放CG动画；
+2、播放本地视频需把视频引入到工程项目中，引入方法：选中target-> Build Phases，将视频拖入Copy Bundle Resources中，这样就可以使用NSString *myFilePath = [[NSBundle mainBundle] pathForResource:filename ofType:nil inDirectory:nil];方法获取到视频的路径了。播放网络视频则只需NSURL类型的url就好了。
+3、 本例是新增一个window，然后把视频播放器的view做为subView放在window上面播放的。如果编译没报错，运行时view出不来，可能是你在使用self.view（应用的view）播放的，需创建代理delegate，在delegate的applicationDidFinishLaunching方法中把rootViewController交给你应用的viewController，比如：
+- (void)applicationDidFinishLaunching:(UIApplication *)application {    
+    
+    // Override point for customization after app launch    
+    [window addSubview:NavigationController.view];
+    [window makeKeyAndVisible];
+    
+    //把self.window.rootViewController交给自己的autoPageViewController
+    autoPageViewController* autoController = [[autoPageViewController alloc] init];
+    self.window.rootViewController = autoController;
+}
+然后，在autoPageViewController中的：
+ - (void)viewDidLoad {
+    [super viewDidLoad];
+方法中开始你的实现方法。ViewController初始化后为什么就调用上方法，请查看IOS开发基础。
+4、附录源代码，注视我写的很详细，以备后用。
