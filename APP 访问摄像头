@@ -1,4 +1,4 @@
-源代码都在我QQ空间的附件里：http://user.qzone.qq.com/460076708/2
+
 1、这里有一点注意的地方和播放CG动画的第三点一样；
 2、上传功能使用到第三方免费的云服务器七牛，接入七牛的SDK需要使用 AFNetworking网络库，所以首先给你的项目安装AFNetworking，具体安装方法可以网上查，步骤也比较简单，主要是不懂原理，第一次会碰到很多问题。在一天一夜的试验下，终于成功搭建环境并调试成功。成功安装和使用以后就考虑采用一个更好用的办法提供给大家，具体步骤如下：1、首先你要先安装CocosPods，安装方法http://code4app.com/article/cocoapods-install-usage，简单易懂；2、使用Xcode新建一个工程，然后打开终端窗口cd进入到你工程的目录中，使用步骤1中的方法使用命令给你的工程安装AFNetworking，成功后在你的项目目录中会获取一个Pods的文件夹，里面有AFNetworking的全套源代码，把它拷出来连同七牛的SDK一起引入你的应用中即可。
 3、 上传时需要用到token，这个的使用秘钥签名加密的捣鼓了好久才搞好，秘钥和公钥在云空间申请后会提供，同时有一个空间域名。token的生成要使用到Base64编码、JSON库转换、hash_mac签名加密，所以分别要引入库，简便的办法是直接引入IOS常用的GTMBase64、AppStore pay的JSONKit等。连同安装的AFNetworking，实现的源代码一起附件吧。
